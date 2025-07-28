@@ -14,6 +14,250 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// =====================================================
+// LTI TALENT TRACKING SYSTEM - PRISMA SCHEMA (OPTIMIZED)
+// =====================================================
+// This schema defines the complete database structure for the LTI system
+// Includes normalization, indexes, constraints, and audit fields
+// =====================================================
+
+// =====================================================
+// NORMALIZED LOOKUP TABLES
+// =====================================================
+
+/// EmploymentType - Normalized employment types
+model EmploymentType {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(50)
+  description String?   @db.VarChar(200)
+  isActive    Boolean   @default(true) @map("is_active")
+  
+  // Audit fields
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  // Relationships
+  positions   Position[]
+  
+  @@map("employment_type")
+}
+
+/// Location - Normalized locations
+model Location {
+  id          Int       @id @default(autoincrement())
+  city        String    @db.VarChar(100)
+  state       String?   @db.VarChar(100)
+  country     String    @db.VarChar(100)
+  isActive    Boolean   @default(true) @map("is_active")
+  
+  // Audit fields
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  // Relationships
+  positions   Position[]
+  
+  // Unique constraint for location combination
+  @@unique([city, state, country])
+  @@map("location")
+}
+
+/// ApplicationStatus - Normalized application statuses
+model ApplicationStatus {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(50)
+  description String?   @db.VarChar(200)
+  color       String?   @db.VarChar(7) // Hex color code
+  isActive    Boolean   @default(true) @map("is_active")
+  
+  // Audit fields
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  // Relationships
+  applications Application[]
+  
+  @@map("application_status")
+}
+
+/// InterviewResult - Normalized interview results
+model InterviewResult {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(50)
+  description String?   @db.VarChar(200)
+  isActive    Boolean   @default(true) @map("is_active")
+  
+  // Audit fields
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  // Relationships
+  interviews  Interview[]
+  
+  @@map("interview_result")
+}
+
+/// PositionStatus - Normalized position statuses
+model PositionStatus {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(50)
+  description String?   @db.VarChar(200)
+  isActive    Boolean   @default(true) @map("is_active")
+  
+  // Audit fields
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  // Relationships
+  positions   Position[]
+  
+  @@map("position_status")
+}
+
+// =====================================================
+// INDEPENDENT TABLES (no foreign keys)
+// =====================================================
+
+/// Company - Stores basic company information
+model Company {
+  id        Int        @id @default(autoincrement())
+  name      String     @db.VarChar(255)
+  isActive  Boolean    @default(true) @map("is_active")
+  
+  // Audit fields
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  
+  // Relationships
+  employees Employee[]
+  positions Position[]
+  
+  @@map("company")
+}
+
+/// InterviewType - Defines different types of interviews
+model InterviewType {
+  id          Int             @id @default(autoincrement())
+  name        String          @unique @db.VarChar(100)
+  description String?
+  isActive    Boolean         @default(true) @map("is_active")
+  
+  // Audit fields
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  
+  // Relationships
+  interviewSteps InterviewStep[]
+  
+  @@map("interview_type")
+}
+
+/// InterviewFlow - Defines complete interview processes
+model InterviewFlow {
+  id          Int             @id @default(autoincrement())
+  name        String          @unique @db.VarChar(255)
+  description String?
+  isActive    Boolean         @default(true) @map("is_active")
+  
+  // Audit fields
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  
+  // Relationships
+  positions      Position[]
+  interviewSteps InterviewStep[]
+  
+  @@map("interview_flow")
+}
+
+// =====================================================
+// DEPENDENT TABLES (with foreign keys)
+// =====================================================
+
+/// Employee - Stores employee information linked to companies
+model Employee {
+  id        Int       @id @default(autoincrement())
+  companyId Int       @map("company_id")
+  name      String    @db.VarChar(255)
+  email     String    @unique @db.VarChar(255)
+  role      String    @db.VarChar(100)
+  isActive  Boolean   @default(true) @map("is_active")
+  
+  // Audit fields
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  
+  // Relationships
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  interviews Interview[]
+  
+  @@map("employee")
+}
+
+/// Position - Stores job positions offered by companies
+model Position {
+  id                    Int       @id @default(autoincrement())
+  companyId             Int       @map("company_id")
+  interviewFlowId       Int       @map("interview_flow_id")
+  positionStatusId      Int       @map("position_status_id")
+  locationId            Int?      @map("location_id")
+  employmentTypeId      Int?      @map("employment_type_id")
+  title                 String    @db.VarChar(255)
+  description           String?
+  isVisible             Boolean   @default(true) @map("is_visible")
+  jobDescription        String?   @map("job_description")
+  requirements          String?
+  responsibilities      String?
+  salaryMin             Decimal?  @map("salary_min") @db.Decimal(10, 2)
+  salaryMax             Decimal?  @map("salary_max") @db.Decimal(10, 2)
+  benefits              String?
+  companyDescription    String?   @map("company_description")
+  applicationDeadline   DateTime? @map("application_deadline")
+  contactInfo           String?   @map("contact_info")
+  
+  // Audit fields
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  
+  // Relationships
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  interviewFlow InterviewFlow @relation(fields: [interviewFlowId], references: [id], onDelete: Restrict)
+  positionStatus PositionStatus @relation(fields: [positionStatusId], references: [id], onDelete: Restrict)
+  location      Location?     @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  employmentType EmploymentType? @relation(fields: [employmentTypeId], references: [id], onDelete: Restrict)
+  applications  Application[]
+  
+  @@map("position")
+}
+
+/// InterviewStep - Defines individual steps within interview flows
+model InterviewStep {
+  id                Int           @id @default(autoincrement())
+  interviewFlowId   Int           @map("interview_flow_id")
+  interviewTypeId   Int           @map("interview_type_id")
+  name              String        @db.VarChar(255)
+  orderIndex        Int           @map("order_index")
+  isActive          Boolean       @default(true) @map("is_active")
+  
+  // Audit fields
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  
+  // Relationships
+  interviewFlow InterviewFlow @relation(fields: [interviewFlowId], references: [id], onDelete: Cascade)
+  interviewType InterviewType @relation(fields: [interviewTypeId], references: [id], onDelete: Restrict)
+  interviews     Interview[]
+  
+  // Unique constraint
+  @@unique([interviewFlowId, orderIndex])
+  @@map("interview_step")
+}
+
+// =====================================================
+// EXISTING CANDIDATE MODELS (preserved from original schema)
+// =====================================================
+
+/// Candidate - Stores candidate information
 model Candidate {
   id                Int               @id @default(autoincrement())
   firstName         String            @db.VarChar(100)
@@ -21,11 +265,23 @@ model Candidate {
   email             String            @unique @db.VarChar(255)
   phone             String?           @db.VarChar(15)
   address           String?           @db.VarChar(100)
+  
+  // Audit fields
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  
+  // Existing relationships
   educations        Education[]
   workExperiences   WorkExperience[]
   resumes           Resume[]
+  
+  // New relationships for LTI system
+  applications      Application[]
+  
+  @@map("candidate")
 }
 
+/// Education - Candidate education history
 model Education {
   id            Int       @id @default(autoincrement())
   institution   String    @db.VarChar(100)
@@ -34,8 +290,15 @@ model Education {
   endDate       DateTime?
   candidateId   Int
   candidate     Candidate @relation(fields: [candidateId], references: [id])
+  
+  // Audit fields
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  @@map("education")
 }
 
+/// WorkExperience - Candidate work experience history
 model WorkExperience {
   id          Int       @id @default(autoincrement())
   company     String    @db.VarChar(100)
@@ -45,8 +308,15 @@ model WorkExperience {
   endDate     DateTime?
   candidateId Int
   candidate   Candidate @relation(fields: [candidateId], references: [id])
+  
+  // Audit fields
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  @@map("work_experience")
 }
 
+/// Resume - Candidate resume files
 model Resume {
   id          Int       @id @default(autoincrement())
   filePath    String    @db.VarChar(500)
@@ -54,4 +324,62 @@ model Resume {
   uploadDate  DateTime
   candidateId Int
   candidate   Candidate @relation(fields: [candidateId], references: [id])
+  
+  // Audit fields
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  @@map("resume")
+}
+
+// =====================================================
+// APPLICATION AND INTERVIEW MODELS
+// =====================================================
+
+/// Application - Links candidates to positions
+model Application {
+  id              Int       @id @default(autoincrement())
+  positionId      Int       @map("position_id")
+  candidateId     Int       @map("candidate_id")
+  applicationStatusId Int   @map("application_status_id")
+  applicationDate DateTime  @default(now()) @map("application_date")
+  notes           String?
+  
+  // Audit fields
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  
+  // Relationships
+  position   Position   @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  candidate  Candidate  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  applicationStatus ApplicationStatus @relation(fields: [applicationStatusId], references: [id], onDelete: Restrict)
+  interviews Interview[]
+  
+  // Unique constraint: prevent multiple applications from same candidate to same position
+  @@unique([candidateId, positionId])
+  @@map("application")
+}
+
+/// Interview - Stores interview results and feedback
+model Interview {
+  id                Int           @id @default(autoincrement())
+  applicationId     Int           @map("application_id")
+  interviewStepId   Int           @map("interview_step_id")
+  employeeId        Int           @map("employee_id")
+  interviewResultId Int?          @map("interview_result_id")
+  interviewDate     DateTime      @map("interview_date")
+  score             Int?          // Will add CHECK constraint via migration
+  notes             String?
+  
+  // Audit fields
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  
+  // Relationships
+  application     Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  interviewStep   InterviewStep @relation(fields: [interviewStepId], references: [id], onDelete: Restrict)
+  employee        Employee      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  interviewResult InterviewResult? @relation(fields: [interviewResultId], references: [id], onDelete: Restrict)
+  
+  @@map("interview")
 }
